@@ -1,136 +1,41 @@
-const SHA256 = require('crypto-js/sha256');
+const { Blockchain, Transaction } = require('./blockchain');
+const EC = require('elliptic').ec;
+const ec = new EC('secp256k1');
 
-class Transaction{
-    constructor(fromAddress, toAddress, amount){
-        this.fromAddress = fromAddress;
-        this.toAddress = toAddress;
-        this.amount = amount;
-    }
-}
+// Your private key goes here
+const myKey = ec.keyFromPrivate('a4c1c74ef88d54296d258f341a475003e690b80e0c1fd44490f9caa0299f0bf0');
 
-class Block {
-    constructor(timestamp, transactions, previousHash) {
-     this.timestamp = timestamp;
-     this.transactions = transactions;
-     this.previousHash = previousHash;
-     this.nonce = 0;
-     this.hash = this.calculateHash();
-    }
-   
-    calculateHash() {
-     return SHA256(this.index + this.previousHash + this.timestamp + JSON.stringify(this.data) + this.nonce);
-    }
-   
-    mineBlock(difficulty) {
-     while (this.hash.toString().substring(0, difficulty) !== Array(difficulty + 1).join("0")) {
-      this.nonce++;
-      this.hash = this.calculateHash();
-     }
-     console.log("Block Successfully hashed: " + this.hash);
-    }
-}
+// From that we can calculate your public key (which doubles as your wallet address)
+const myWalletAddress = myKey.getPublic('hex');
 
-class Blockchain{
-    constructor(){
-        this.chain = [this.createGenesisBlock()];
-        this.difficulty = 2;
-        this.pendingTransactions = [];
-        this.miningReward = 100;
-    }
+// Create new instance of Blockchain class
+const CoinBear = new Blockchain();
 
-    createGenesisBlock(){
-        return new Block("01/01/2017", "Genesis Block", "0");
-    }
+// Create a transaction & sign it with your key
+const tx1 = new Transaction(myWalletAddress, 'address2', 100);
+tx1.signTransaction(myKey);
+CoinBear.addTransaction(tx1);
 
-    getLatestBlock(){
-        return this.chain[this.chain.length - 1];
-    }
+// Mine block
+CoinBear.minePendingTransactions(myWalletAddress);
 
-    minePendingTransactions(miningRewardAddress) {
-        const rewardTx = new Transaction(null, miningRewardAddress, this.miningReward);
-        this.pendingTransactions.push(rewardTx);
-    
-        const block = new Block(Date.now(), this.pendingTransactions, this.getLatestBlock().hash);
-        block.mineBlock(this.difficulty);
-    
-        console.log('Block successfully mined!');
+// Create second transaction
+const tx2 = new Transaction(myWalletAddress, 'address1', 50);
+tx2.signTransaction(myKey);
+CoinBear.addTransaction(tx2);
 
-        this.chain.push(block);
-    
-        this.pendingTransactions = [];
-      }
+// Mine block
+CoinBear.minePendingTransactions(myWalletAddress);
 
-    createTransaction(transaction){
-        this.pendingTransactions.push(transaction);
-    }
+console.log();
+console.log(`Balance of Nolan is ${CoinBear.getBalanceOfAddress(myWalletAddress)}`);
 
-    getBalanceOfAddress(address){
-        let balance = 0;
+// Uncomment this line if you want to test tampering with the chain
+// CoinBear.chain[1].transactions[0].amount = 10;
 
-        for(const block of this.chain){
-            for(const trans of block.transactions){
-                if(trans.fromAddress === address){
-                    balance -= trans.amount;
-                }
-
-                if(trans.toAddress === address){
-                    balance += trans.amount;
-                }
-            }
-        }
-
-        return balance;
-    }
-
-
-    /*
-    addBlock(newBlock){
-        newBlock.previousHash = this.getLatestBlock().hash;
-        newBlock.mineBlock(this.difficulty);
-        this.chain.push(newBlock);
-    }
-    */
-
-    isChainValid(){
-        for(let i = 1; i < this.chain.length; i++){
-            const currentBlock = this.chain[i];
-            const previousBlock = this.chain[i - 1];
-
-            if(currentBlock.hash !== currentBlock.calculateHash()){
-                return false;
-            }
-
-            if(currentBlock.previousHash !== previousBlock.hash){
-                return false;
-            }
-
-        }
-
-        return true;
-    }
-}
-
-let CoinBear = new Blockchain();
-CoinBear.createTransaction(new Transaction('address1', 'address2', 100));
-CoinBear.createTransaction(new Transaction('address2', 'address1', 50));
-
-
-console.log('\nStarting the miner...');
-CoinBear.minePendingTransactions('nolans-address');
-
-console.log('Balance of Nolan is: ', CoinBear.getBalanceOfAddress('nolans-address'));
-
-console.log('\nStarting the miner again...');
-CoinBear.minePendingTransactions('nolans-address');
-
-console.log('Balance of Nolan is: ', CoinBear.getBalanceOfAddress('nolans-address'));
-
-
-
-
-
-
-
+// Check if the chain is valid
+console.log();
+console.log('Blockchain valid?', CoinBear.isChainValid() ? 'Yes' : 'No');
 /*
 console.log('Mining Block 1...');
 CoinBear.addBlock(new Block(1, "20/07/2017", {  amount: 4}));
